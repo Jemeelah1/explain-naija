@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import ExplanationAudioControl from "./ExplanationAudioControl";
 import {
   Sparkles,
   AlertCircle,
@@ -152,11 +153,6 @@ function parseContentBlocks(content: string): ContentBlock[] {
   return blocks;
 }
 
-/**
- * Robustly parse AI output into structured sections.
- * Detects numbered headers like "1. In Plain Words:", "**1. In Plain Words:**", "1. Ni Ọ̀rọ̀ Rọ̀rùn:", etc.
- * Falls back gracefully to single explanation section so NO CONTENT is ever omitted.
- */
 export function parseExplanation(text: string): ParsedSection[] {
   if (!text || typeof text !== "string") return [];
 
@@ -527,8 +523,8 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
                   loadSample(sample);
                 }}
                 className={`px-3 py-1 rounded-full border transition-all text-xs font-medium cursor-pointer ${activeSample?.id === sample.id
-                    ? "bg-[#0C281C] text-white border-[#0C281C] shadow-sm"
-                    : "bg-[#F8F5EE] hover:bg-[#EDE7DA] text-[#1C543C] border-[#E8E2D5]"
+                  ? "bg-[#0C281C] text-white border-[#0C281C] shadow-sm"
+                  : "bg-[#F8F5EE] hover:bg-[#EDE7DA] text-[#1C543C] border-[#E8E2D5]"
                   } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
                 title={`Load ${sample.label}`}
               >
@@ -554,8 +550,8 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
               onChange={handleTextChange}
               placeholder="Paste a notice, announcement, or anything you want explained…"
               className={`w-full rounded-2xl p-4 sm:p-5 text-base sm:text-lg text-[#1A2421] placeholder-[#8C9B93] bg-[#FCFAF6] border transition-all resize-y focus:outline-none focus:bg-white leading-relaxed ${validationError
-                  ? "border-red-400 focus:ring-2 focus:ring-red-400 bg-red-50/20"
-                  : "border-[#DDD5C5] focus:border-[#1C543C] focus:ring-2 focus:ring-[#84CC16]/50"
+                ? "border-red-400 focus:ring-2 focus:ring-red-400 bg-red-50/20"
+                : "border-[#DDD5C5] focus:border-[#1C543C] focus:ring-2 focus:ring-[#84CC16]/50"
                 } ${isLoading ? "opacity-75 bg-[#F9F7F2]" : ""}`}
             />
 
@@ -773,6 +769,13 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
                 </div>
               </div>
             </div>
+
+            {/* Accessible Audio Narration Control */}
+            <ExplanationAudioControl
+              key={`${explanationResult.language}-${explanationResult.explanation.slice(0, 32)}`}
+              textToRead={explanationResult.explanation}
+              language={explanationResult.language}
+            />
 
             {/* Interactive breakdown preview card */}
             <div className="rounded-2xl bg-[#FCFAF6] border border-[#DDD5C5] p-5 sm:p-7 shadow-sm">
