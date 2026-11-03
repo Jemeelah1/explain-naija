@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { metaAI } from "@/lib/meta";
+import { getMetaAI } from "@/lib/meta";
 
 export async function POST(request: NextRequest) {
     try {
@@ -73,6 +73,9 @@ DOCUMENT:
 ${text}
 </document>
 `;
+
+        // Initialise the Meta client only when the API is called.
+        const metaAI = getMetaAI();
 
         const response = await metaAI.responses.create({
             model: "muse-spark-1.3",
