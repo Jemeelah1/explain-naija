@@ -10,7 +10,6 @@ export default function Footer() {
     <footer className="bg-[#FAF7F0] border-t border-[#E8E2D5] pt-16 pb-12 text-[#273730]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-[#E8E2D5]">
-          {/* Brand & Tagline Column */}
           <div className="md:col-span-2 space-y-4">
             <Link href="/" className="inline-block focus:outline-none focus-visible:ring-2 focus-visible:ring-[#84CC16] rounded-xl">
               <BrandLogo size="md" />
@@ -23,7 +22,6 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Navigation Links */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#0C281C] mb-4">
               Explore
@@ -64,7 +62,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Dialects & Civic Focus */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#0C281C] mb-4">
               Languages
@@ -79,7 +76,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Mandatory Experimental AI Disclaimer Box */}
         <div className="my-8 rounded-2xl bg-[#F2EDE2]/70 border border-[#E2DDD1] p-4 sm:p-5 flex items-start gap-3 text-xs text-[#4B5E55] leading-relaxed">
           <AlertCircle className="w-5 h-5 text-[#1C543C] shrink-0 mt-0.5" />
           <div>
@@ -92,7 +88,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6F8279] pt-4">
           <p>© {currentYear} Explain Naija. All rights reserved.</p>
           <p className="flex items-center gap-1.5 font-medium text-[#1C543C]">

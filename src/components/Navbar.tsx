@@ -39,7 +39,6 @@ export default function Navbar({ onTryItFree }: NavbarProps) {
     <header className="sticky top-0 z-50 w-full bg-[#FDFBF7]/90 backdrop-blur-md border-b border-[#E8E2D5]/80 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Brand */}
           <Link
             href="/"
             className="flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#84CC16] rounded-xl p-1"
@@ -48,7 +47,6 @@ export default function Navbar({ onTryItFree }: NavbarProps) {
             <BrandLogo size="md" />
           </Link>
 
-          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8" aria-label="Main Navigation">
             <a
               href="#how-it-works"
@@ -80,7 +78,6 @@ export default function Navbar({ onTryItFree }: NavbarProps) {
             </a>
           </nav>
 
-          {/* Action Button */}
           <div className="hidden md:flex items-center gap-3">
             <button
               onClick={handleTryFree}
@@ -91,7 +88,6 @@ export default function Navbar({ onTryItFree }: NavbarProps) {
             </button>
           </div>
 
-          {/* Mobile Menu Button */}
           <div className="flex md:hidden">
             <button
               type="button"
@@ -106,7 +102,6 @@ export default function Navbar({ onTryItFree }: NavbarProps) {
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-[#E8E2D5] bg-[#FDFBF7] px-4 pt-3 pb-6 shadow-xl animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col gap-3">

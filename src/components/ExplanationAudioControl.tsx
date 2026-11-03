@@ -23,9 +23,6 @@ interface VoiceMatchResult {
   needsFallbackConsent: boolean;
 }
 
-/**
- * Cleans markdown formatting and breaks the explanation into natural section-based speech chunks.
- */
 function cleanAndChunkText(text: string): string[] {
   if (!text) return [];
 
@@ -53,14 +50,6 @@ function cleanAndChunkText(text: string): string[] {
   return chunks.length > 0 ? chunks : [text.trim()];
 }
 
-/**
- * Matches speech synthesis voice to the requested language.
- * - Simple English: en-NG or another suitable English voice
- * - Yoruba: yo-NG
- * - Hausa: ha-NG
- * - Igbo: ig-NG
- * - Nigerian Pidgin: en-NG where available; otherwise requires consent for English fallback.
- */
 function matchVoiceForLanguage(
   voices: SpeechSynthesisVoice[],
   language: string
@@ -221,7 +210,6 @@ export default function ExplanationAudioControl({
   const isCancelledRef = useRef(false);
   const speakChunkRef = useRef<((index: number, targetRate?: number) => void) | null>(null);
 
-  // Subscribe to voice list updates
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
@@ -255,7 +243,6 @@ export default function ExplanationAudioControl({
     return matchVoiceForLanguage(voices, language);
   }, [voices, language]);
 
-  // Keep speakChunkRef updated with latest closures
   const speakChunk = useCallback(
     (index: number, targetRate?: number) => {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -394,7 +381,6 @@ export default function ExplanationAudioControl({
       aria-label="Listen to explanation audio control"
       className="rounded-2xl bg-[#FCFAF6] border border-[#DDD5C5] p-5 sm:p-6 mb-6 shadow-xs transition-all"
     >
-      {/* Top Header of Audio Control */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E8E2D5]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-[#0C281C] text-[#BEF264] flex items-center justify-center shrink-0">
@@ -410,7 +396,6 @@ export default function ExplanationAudioControl({
           </div>
         </div>
 
-        {/* Live Audio Status Indicator */}
         <div className="flex items-center gap-2" aria-live="polite">
           {status === "playing" && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#BEF264]/40 text-[#0C281C] border border-[#84CC16]/60">
@@ -443,9 +428,7 @@ export default function ExplanationAudioControl({
         </div>
       </div>
 
-      {/* Main Controls Row */}
       <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        {/* Play / Pause / Resume / Stop Button Group */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {status === "idle" && (
             <button
@@ -499,7 +482,6 @@ export default function ExplanationAudioControl({
           </button>
         </div>
 
-        {/* Playback Speed Controls */}
         <div className="flex items-center gap-2" role="group" aria-label="Playback speed selector">
           <span className="text-xs font-semibold uppercase tracking-wider text-[#5A6D64]">
             Speed:
@@ -525,7 +507,6 @@ export default function ExplanationAudioControl({
         </div>
       </div>
 
-      {/* Language-Specific Voice Unavailable Consent Banner */}
       {showConsentBanner && (
         <div
           role="alert"
@@ -557,7 +538,6 @@ export default function ExplanationAudioControl({
         </div>
       )}
 
-      {/* Voice Information Caption */}
       <div className="mt-3 text-[11px] text-[#6F8279] flex flex-wrap items-center justify-between gap-2">
         <span>
           {voiceMatch.isNative ? (

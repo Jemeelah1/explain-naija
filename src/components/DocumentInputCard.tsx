@@ -18,6 +18,9 @@ import {
   HelpCircle,
   Users,
   ArrowRight,
+  UploadCloud,
+  Trash2,
+  FileCheck,
 } from "lucide-react";
 
 export interface BreakdownContent {
@@ -34,6 +37,14 @@ export interface DocumentSample {
   originalText: string;
   sampleBreakdown?: BreakdownContent;
   translations?: Record<string, BreakdownContent>;
+}
+
+export interface UploadedFileInfo {
+  name: string;
+  size: number;
+  type: "pdf" | "docx" | "txt";
+  characterCount: number;
+  isTruncated?: boolean;
 }
 
 export const SAMPLE_DOCUMENTS: DocumentSample[] = [
@@ -93,10 +104,32 @@ export interface ExplainApiResponse {
   model?: string;
 }
 
-/**
- * Split section body content into paragraphs, bullet lists, and numbered lists
- * without losing any text or formatting.
- */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function getFileTypeBadge(type: "pdf" | "docx" | "txt") {
+  switch (type) {
+    case "pdf":
+      return {
+        label: "PDF Document",
+        badgeClass: "bg-red-50 text-red-700 border-red-200",
+      };
+    case "docx":
+      return {
+        label: "Word Document",
+        badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
+      };
+    case "txt":
+      return {
+        label: "Plain Text",
+        badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      };
+  }
+}
+
 function parseContentBlocks(content: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const lines = content.split(/\r?\n/);
@@ -122,7 +155,6 @@ function parseContentBlocks(content: string): ContentBlock[] {
       continue;
     }
 
-    // Check for bullet items (- or * or •)
     const bulletMatch = trimmed.match(/^[-*•]\s+(.+)$/);
     if (bulletMatch) {
       if (currentList.length > 0 && currentListType !== "bullet") {
@@ -133,7 +165,6 @@ function parseContentBlocks(content: string): ContentBlock[] {
       continue;
     }
 
-    // Check for numbered sub-items (e.g. 1. or 1) )
     const numberedMatch = trimmed.match(/^(\d+)[\.\)]\s+(.+)$/);
     if (numberedMatch) {
       if (currentList.length > 0 && currentListType !== "numbered") {
@@ -144,7 +175,6 @@ function parseContentBlocks(content: string): ContentBlock[] {
       continue;
     }
 
-    // Regular paragraph
     flushList();
     blocks.push({ type: "paragraph", text: trimmed });
   }
@@ -169,7 +199,6 @@ export function parseExplanation(text: string): ParsedSection[] {
     const match = line.match(headerRegex);
     if (match) {
       const num = parseInt(match[1], 10);
-      // Valid top-level section: 1-6 advancing sequentially
       if ((currentNum === 0 && num === 1) || (num > currentNum && num <= 6)) {
         if (currentHeader) {
           sections.push({
@@ -223,9 +252,6 @@ export function parseExplanation(text: string): ParsedSection[] {
   }));
 }
 
-/**
- * Format markdown bold text (**text**) safely into <strong> elements
- */
 function renderFormattedText(text?: string) {
   if (!text) return null;
   if (!text.includes("**")) {
@@ -244,9 +270,6 @@ function renderFormattedText(text?: string) {
   });
 }
 
-/**
- * Returns tailored badge colors and icons for each numbered section
- */
 function getSectionStyle(num: number) {
   switch (num) {
     case 1:
@@ -287,6 +310,7 @@ interface DocumentInputCardProps {
 }
 
 export default function DocumentInputCard({ selectedSample }: DocumentInputCardProps) {
+  const [inputMode, setInputMode] = useState<"upload" | "paste">("upload");
   const [text, setText] = useState("");
   const [language, setLanguage] = useState<SupportedLanguage>("Simple English");
   const [validationError, setValidationError] = useState("");
@@ -297,33 +321,61 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
   const [copied, setCopied] = useState(false);
   const [prevSample, setPrevSample] = useState<DocumentSample | null | undefined>(selectedSample);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [uploadedFile, setUploadedFile] = useState<UploadedFileInfo | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractingFileName, setExtractingFileName] = useState("");
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Sync state when selectedSample prop changes during user navigation
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const stopAudio = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopAudio();
+    };
+  }, [stopAudio]);
+
   if (selectedSample !== prevSample) {
     setPrevSample(selectedSample);
     if (selectedSample) {
+      stopAudio();
+      setInputMode("paste");
+      setUploadedFile(null);
       setText(selectedSample.originalText);
       setActiveSample(selectedSample);
       setValidationError("");
+      setExtractionError(null);
       setApiError(null);
       setExplanationResult(null);
     }
   }
 
-  const loadSample = useCallback((sample: DocumentSample) => {
-    setText(sample.originalText);
-    setActiveSample(sample);
-    setValidationError("");
-    setApiError(null);
-    setExplanationResult(null);
-    if (textareaRef.current) {
-      textareaRef.current.value = sample.originalText;
-      textareaRef.current.focus();
-    }
-  }, []);
+  const loadSample = useCallback(
+    (sample: DocumentSample) => {
+      stopAudio();
+      setInputMode("paste");
+      setUploadedFile(null);
+      setExtractionError(null);
+      setText(sample.originalText);
+      setActiveSample(sample);
+      setValidationError("");
+      setApiError(null);
+      setExplanationResult(null);
+      if (textareaRef.current) {
+        textareaRef.current.value = sample.originalText;
+        textareaRef.current.focus();
+      }
+    },
+    [stopAudio]
+  );
 
-  // Support global custom event from external trigger buttons
   useEffect(() => {
     const handleCustomSample = (e: Event) => {
       const customEvent = e as CustomEvent<DocumentSample>;
@@ -337,7 +389,6 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
     };
   }, [loadSample]);
 
-  // Scroll into view on explanation ready
   useEffect(() => {
     if (explanationResult) {
       const breakdownEl = document.getElementById("breakdown-preview");
@@ -347,7 +398,6 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
     }
   }, [explanationResult]);
 
-  // Scroll into view when loading starts
   useEffect(() => {
     if (isLoading) {
       const loadingEl = document.getElementById("breakdown-loading");
@@ -357,7 +407,6 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
     }
   }, [isLoading]);
 
-  // Scroll into view when error occurs
   useEffect(() => {
     if (apiError) {
       const errorEl = document.getElementById("breakdown-error");
@@ -379,22 +428,154 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
   };
 
   const handleClear = () => {
+    stopAudio();
     setText("");
+    setUploadedFile(null);
     setActiveSample(null);
     setValidationError("");
+    setExtractionError(null);
     setApiError(null);
     setExplanationResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
     if (textareaRef.current) {
       textareaRef.current.value = "";
       textareaRef.current.focus();
     }
   };
 
+  const handleFileSelect = async (file: File) => {
+    setExtractionError(null);
+    setValidationError("");
+    setApiError(null);
+    setExplanationResult(null);
+    stopAudio();
+
+    if (file.size === 0) {
+      setExtractionError("The uploaded file is empty. Please choose a document with content.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setExtractionError(
+        `File size (${(file.size / (1024 * 1024)).toFixed(
+          1
+        )}MB) exceeds the 5MB limit. Please upload a smaller document.`
+      );
+      return;
+    }
+
+    const lowerName = file.name.toLowerCase();
+    const validExtensions = [".pdf", ".docx", ".txt"];
+    const hasValidExt = validExtensions.some((ext) => lowerName.endsWith(ext));
+
+    if (!hasValidExt) {
+      setExtractionError(
+        "Unsupported file format. Please upload a PDF (.pdf), Microsoft Word (.docx), or plain text (.txt) document."
+      );
+      return;
+    }
+
+    setIsExtracting(true);
+    setExtractingFileName(file.name);
+    setInputMode("upload");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        setExtractionError(
+          data?.error ||
+            "Unable to extract text from this document. Please try copying and pasting the text instead."
+        );
+        setUploadedFile(null);
+      } else {
+        setUploadedFile({
+          name: data.fileName,
+          size: data.fileSize,
+          type: data.fileType,
+          characterCount: data.characterCount,
+          isTruncated: data.isTruncated,
+        });
+        setText(data.text);
+        if (textareaRef.current) {
+          textareaRef.current.value = data.text;
+        }
+        setExtractionError(null);
+      }
+    } catch (err) {
+      console.error("Extraction request failed:", err);
+      setExtractionError(
+        "Network connection issue while processing document. Please check your connection and try again."
+      );
+      setUploadedFile(null);
+    } finally {
+      setIsExtracting(false);
+      setExtractingFileName("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveFile = () => {
+    stopAudio();
+    setUploadedFile(null);
+    setText("");
+    setExtractionError(null);
+    setValidationError("");
+    setApiError(null);
+    setExplanationResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    if (textareaRef.current) {
+      textareaRef.current.value = "";
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  };
+
   const handleExplain = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    // Prevent duplicate requests while already in flight
-    if (isLoading) return;
+    if (isLoading || isExtracting) return;
 
     const domValue = textareaRef.current ? textareaRef.current.value : "";
     const currentText = (text && text.trim().length > 0 ? text : domValue) || "";
@@ -402,7 +583,7 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
 
     if (!trimmed) {
       setValidationError(
-        "Please paste or type an announcement, circular, or document text first to get an explanation."
+        "Please paste document text or upload a file first to get an explanation."
       );
       setExplanationResult(null);
       setApiError(null);
@@ -434,6 +615,7 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
 
     setValidationError("");
     setApiError(null);
+    stopAudio();
     setIsLoading(true);
 
     try {
@@ -489,16 +671,16 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
     ? parseExplanation(explanationResult.explanation)
     : [];
 
+  const fileBadge = uploadedFile ? getFileTypeBadge(uploadedFile.type) : null;
+
   return (
     <div
       id="input-section"
       className="w-full max-w-4xl mx-auto rounded-3xl bg-white border border-[#E8E2D5] shadow-2xl shadow-[#0C281C]/8 overflow-hidden transition-all duration-300 relative"
     >
-      {/* Top subtle decorative accent bar */}
       <div className="h-2 w-full bg-gradient-to-r from-[#0C281C] via-[#1C543C] to-[#84CC16]" />
 
       <div className="p-6 sm:p-8 md:p-10">
-        {/* Card Header with quick status and sample pills */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#F2EDE2]">
           <div className="flex items-center gap-2.5">
             <span className="flex h-3 w-3 relative">
@@ -510,22 +692,22 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
             </span>
           </div>
 
-          {/* Quick sample chips */}
           <div className="flex items-center flex-wrap gap-2 text-xs">
             <span className="text-[#5A6D64] font-medium hidden sm:inline">Try sample:</span>
             {SAMPLE_DOCUMENTS.map((sample) => (
               <button
                 key={sample.id}
                 type="button"
-                disabled={isLoading}
+                disabled={isLoading || isExtracting}
                 onClick={(e) => {
                   e.preventDefault();
                   loadSample(sample);
                 }}
-                className={`px-3 py-1 rounded-full border transition-all text-xs font-medium cursor-pointer ${activeSample?.id === sample.id
-                  ? "bg-[#0C281C] text-white border-[#0C281C] shadow-sm"
-                  : "bg-[#F8F5EE] hover:bg-[#EDE7DA] text-[#1C543C] border-[#E8E2D5]"
-                  } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`px-3 py-1 rounded-full border transition-all text-xs font-medium cursor-pointer ${
+                  activeSample?.id === sample.id && inputMode === "paste"
+                    ? "bg-[#0C281C] text-white border-[#0C281C] shadow-sm"
+                    : "bg-[#F8F5EE] hover:bg-[#EDE7DA] text-[#1C543C] border-[#E8E2D5]"
+                } ${isLoading || isExtracting ? "opacity-50 cursor-not-allowed" : ""}`}
                 title={`Load ${sample.label}`}
               >
                 {sample.label}
@@ -534,65 +716,295 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
           </div>
         </div>
 
-        {/* Form area */}
-        <form onSubmit={handleExplain} className="mt-6 space-y-6">
-          {/* Textarea container */}
-          <div className="relative">
-            <label htmlFor="document-input" className="sr-only">
-              Paste notice or announcement
-            </label>
-            <textarea
-              id="document-input"
-              ref={textareaRef}
-              rows={6}
-              value={text}
-              disabled={isLoading}
-              onChange={handleTextChange}
-              placeholder="Paste a notice, announcement, or anything you want explained…"
-              className={`w-full rounded-2xl p-4 sm:p-5 text-base sm:text-lg text-[#1A2421] placeholder-[#8C9B93] bg-[#FCFAF6] border transition-all resize-y focus:outline-none focus:bg-white leading-relaxed ${validationError
-                ? "border-red-400 focus:ring-2 focus:ring-red-400 bg-red-50/20"
-                : "border-[#DDD5C5] focus:border-[#1C543C] focus:ring-2 focus:ring-[#84CC16]/50"
-                } ${isLoading ? "opacity-75 bg-[#F9F7F2]" : ""}`}
-            />
+        <div className="mt-6 flex items-center gap-2 flex-wrap pb-4">
+          <button
+            type="button"
+            onClick={() => setInputMode("upload")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              inputMode === "upload"
+                ? "bg-[#0C281C] text-white shadow-xs"
+                : "bg-[#F8F5EE] text-[#4B5E55] hover:bg-[#EDE7DA] border border-[#E8E2D5]"
+            }`}
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-[#84CC16]" />
+            <span>Upload Document</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#BEF264]/20 text-[#BEF264]">
+              PDF • DOCX • TXT
+            </span>
+          </button>
 
-            {/* Bottom textarea utility bar */}
-            <div className="flex items-center justify-between text-xs text-[#6F8279] mt-2 px-1">
-              <div className="flex items-center gap-2">
-                <span>{text.length} characters</span>
-                {text.length > 0 && !isLoading && (
+          <button
+            type="button"
+            onClick={() => setInputMode("paste")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              inputMode === "paste"
+                ? "bg-[#0C281C] text-white shadow-xs"
+                : "bg-[#F8F5EE] text-[#4B5E55] hover:bg-[#EDE7DA] border border-[#E8E2D5]"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-[#84CC16]" />
+            <span>Paste or Type Text</span>
+          </button>
+        </div>
+
+        <form onSubmit={handleExplain} className="space-y-6">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            onChange={(e) => {
+              if (e.target.files?.[0]) {
+                handleFileSelect(e.target.files[0]);
+              }
+            }}
+            className="sr-only"
+            tabIndex={-1}
+          />
+
+          {inputMode === "upload" && (
+            <div className="space-y-4">
+              {isExtracting && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="rounded-2xl bg-[#F0F8F3] border border-[#C6E6D2] p-8 text-center flex flex-col items-center justify-center animate-in fade-in duration-200"
+                >
+                  <div className="w-12 h-12 rounded-full bg-[#0C281C] text-[#BEF264] flex items-center justify-center mb-3 shadow-md">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#84CC16]" />
+                  </div>
+                  <h4 className="text-base font-bold text-[#0C281C]">
+                    Extracting document text…
+                  </h4>
+                  <p className="text-xs text-[#3E5248] mt-1 max-w-sm truncate" title={extractingFileName}>
+                    Reading <strong>{extractingFileName}</strong> securely on server
+                  </p>
+                  <div className="w-48 h-2 bg-[#D4E8DC] rounded-full mt-4 overflow-hidden">
+                    <div className="h-full bg-[#84CC16] rounded-full animate-pulse w-3/4" />
+                  </div>
+                </div>
+              )}
+
+              {uploadedFile && !isExtracting && (
+                <div className="rounded-2xl bg-[#F8F5EE] border border-[#DDD5C5] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-xl bg-[#0C281C] text-[#BEF264] flex items-center justify-center shrink-0 shadow-xs">
+                      <FileCheck className="w-5 h-5 text-[#BEF264]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4
+                          className="text-sm font-bold text-[#0C281C] truncate max-w-[240px] sm:max-w-[340px]"
+                          title={uploadedFile.name}
+                        >
+                          {uploadedFile.name}
+                        </h4>
+                        {fileBadge && (
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${fileBadge.badgeClass}`}
+                          >
+                            {fileBadge.label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 sm:gap-3 text-xs text-[#5A6D64] mt-1 flex-wrap">
+                        <span>{formatFileSize(uploadedFile.size)}</span>
+                        <span>•</span>
+                        <span>{uploadedFile.characterCount.toLocaleString()} characters</span>
+                        {uploadedFile.isTruncated && (
+                          <>
+                            <span>•</span>
+                            <span className="text-amber-700 font-medium">Trimmed to 15,000 char limit</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white border border-[#DDD5C5] text-[#1C543C] hover:bg-[#F2EDE2] transition-colors cursor-pointer shadow-2xs"
+                    >
+                      Replace file
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      aria-label="Remove uploaded file"
+                      className="p-1.5 rounded-full text-[#6F8279] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                      title="Remove file"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!uploadedFile && !isExtracting && (
+                <div
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label="Upload document area. Drop a PDF, DOCX, or TXT file here or press Enter to browse files."
+                  className={`rounded-2xl p-8 sm:p-10 border-2 border-dashed transition-all cursor-pointer text-center flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#84CC16] ${
+                    isDragging
+                      ? "border-[#84CC16] bg-[#BEF264]/10 scale-[1.01]"
+                      : "border-[#DDD5C5] hover:border-[#1C543C] bg-[#FCFAF6] hover:bg-[#F8F5EE]"
+                  }`}
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-[#0C281C] text-[#BEF264] flex items-center justify-center mb-3 shadow-md">
+                    <UploadCloud className="w-7 h-7 text-[#84CC16]" />
+                  </div>
+
+                  <h4 className="text-base sm:text-lg font-bold text-[#0C281C]">
+                    Drag & drop your document here
+                  </h4>
+                  <p className="text-xs sm:text-sm text-[#4B5E55] mt-1">
+                    or{" "}
+                    <span className="font-semibold text-[#1C543C] underline underline-offset-2 hover:text-[#0C281C]">
+                      Browse files
+                    </span>{" "}
+                    from your computer or phone
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-4 flex-wrap justify-center text-[11px] text-[#5A6D64]">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#E7F3EC] text-[#1C543C] font-semibold border border-[#C6E6D2]">
+                      PDF (.pdf)
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#E7F3EC] text-[#1C543C] font-semibold border border-[#C6E6D2]">
+                      Word (.docx)
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#E7F3EC] text-[#1C543C] font-semibold border border-[#C6E6D2]">
+                      Plain text (.txt)
+                    </span>
+                    <span className="text-[#8C9B93]">Max 5MB</span>
+                  </div>
+                </div>
+              )}
+
+              {extractionError && (
+                <div
+                  role="alert"
+                  className="p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-sm text-red-700 animate-in fade-in duration-200"
+                >
+                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-red-800">Upload error</p>
+                    <p className="mt-0.5 text-xs text-red-700 leading-relaxed">{extractionError}</p>
+                  </div>
                   <button
                     type="button"
-                    onClick={handleClear}
-                    className="inline-flex items-center gap-1 text-[#1C543C] hover:text-[#0C281C] font-medium cursor-pointer underline underline-offset-2 ml-2"
+                    onClick={() => setExtractionError(null)}
+                    className="text-xs text-red-600 hover:text-red-800 font-semibold cursor-pointer underline"
                   >
-                    <RotateCcw className="w-3 h-3" />
-                    Clear text
+                    Dismiss
                   </button>
-                )}
-              </div>
-              <span className="text-[#8C9B93] hidden sm:inline">
-                Supports circulars, bills, gazettes & statements
-              </span>
-            </div>
-
-            {/* Validation Message */}
-            {validationError && (
-              <div
-                role="alert"
-                className="mt-3 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-sm text-red-700 animate-in fade-in-50 duration-200"
-              >
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-red-800">Please provide some content</p>
-                  <p className="mt-0.5 text-red-700">{validationError}</p>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* Action Row: Language dropdown + Primary Explain button */}
+              {uploadedFile && (
+                <div className="space-y-1.5 pt-2">
+                  <div className="flex items-center justify-between text-xs px-1">
+                    <span className="font-semibold text-[#0C281C] flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#1C543C]" />
+                      Extracted document text preview:
+                    </span>
+                    <span className="text-[#6F8279] hidden sm:inline">
+                      Review or edit text before explaining
+                    </span>
+                  </div>
+
+                  <textarea
+                    id="document-input-preview"
+                    ref={textareaRef}
+                    rows={5}
+                    value={text}
+                    disabled={isLoading}
+                    onChange={handleTextChange}
+                    className="w-full rounded-2xl p-4 text-sm sm:text-base text-[#1A2421] placeholder-[#8C9B93] bg-[#FCFAF6] border border-[#DDD5C5] focus:border-[#1C543C] focus:ring-2 focus:ring-[#84CC16]/50 transition-all resize-y leading-relaxed"
+                  />
+
+                  <div className="flex items-center justify-between text-xs text-[#6F8279] px-1">
+                    <span>{text.length} characters ready for AI explanation</span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      className="text-xs text-[#1C543C] hover:text-[#0C281C] underline font-medium cursor-pointer"
+                    >
+                      Clear & remove document
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {inputMode === "paste" && (
+            <div className="relative">
+              <label htmlFor="document-input" className="sr-only">
+                Paste notice or announcement
+              </label>
+              <textarea
+                id="document-input"
+                ref={textareaRef}
+                rows={6}
+                value={text}
+                disabled={isLoading}
+                onChange={handleTextChange}
+                placeholder="Paste a notice, announcement, or anything you want explained…"
+                className={`w-full rounded-2xl p-4 sm:p-5 text-base sm:text-lg text-[#1A2421] placeholder-[#8C9B93] bg-[#FCFAF6] border transition-all resize-y focus:outline-none focus:bg-white leading-relaxed ${
+                  validationError
+                    ? "border-red-400 focus:ring-2 focus:ring-red-400 bg-red-50/20"
+                    : "border-[#DDD5C5] focus:border-[#1C543C] focus:ring-2 focus:ring-[#84CC16]/50"
+                } ${isLoading ? "opacity-75 bg-[#F9F7F2]" : ""}`}
+              />
+
+              <div className="flex items-center justify-between text-xs text-[#6F8279] mt-2 px-1">
+                <div className="flex items-center gap-2">
+                  <span>{text.length} characters</span>
+                  {text.length > 0 && !isLoading && (
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="inline-flex items-center gap-1 text-[#1C543C] hover:text-[#0C281C] font-medium cursor-pointer underline underline-offset-2 ml-2"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Clear text
+                    </button>
+                  )}
+                </div>
+                <span className="text-[#8C9B93] hidden sm:inline">
+                  Supports circulars, bills, gazettes & statements
+                </span>
+              </div>
+            </div>
+          )}
+
+          {validationError && (
+            <div
+              role="alert"
+              className="p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-sm text-red-700 animate-in fade-in-50 duration-200"
+            >
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-800">Content required</p>
+                <p className="mt-0.5 text-xs text-red-700">{validationError}</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2">
-            {/* Language Selector */}
             <div className="relative min-w-[220px]">
               <label
                 htmlFor="language-select"
@@ -607,10 +1019,11 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
                 <select
                   id="language-select"
                   value={language}
-                  disabled={isLoading}
+                  disabled={isLoading || isExtracting}
                   onChange={handleLanguageChange}
-                  className={`w-full appearance-none rounded-xl bg-[#F8F5EE] hover:bg-[#F2EDE2] border border-[#DDD5C5] pl-10 pr-10 py-3 text-sm font-semibold text-[#0C281C] focus:outline-none focus:ring-2 focus:ring-[#84CC16] focus:border-[#1C543C] cursor-pointer transition-colors ${isLoading ? "opacity-60 cursor-not-allowed" : ""
-                    }`}
+                  className={`w-full appearance-none rounded-xl bg-[#F8F5EE] hover:bg-[#F2EDE2] border border-[#DDD5C5] pl-10 pr-10 py-3 text-sm font-semibold text-[#0C281C] focus:outline-none focus:ring-2 focus:ring-[#84CC16] focus:border-[#1C543C] cursor-pointer transition-colors ${
+                    isLoading || isExtracting ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
                 >
                   {LANGUAGES.map((lang) => (
                     <option key={lang.value} value={lang.value}>
@@ -624,13 +1037,13 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
               </div>
             </div>
 
-            {/* Explain Button */}
             <div className="flex flex-col sm:items-end justify-end pt-2 sm:pt-0">
               <button
                 type="submit"
-                disabled={isLoading}
-                className={`w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-3.5 rounded-full text-base font-semibold bg-[#0C281C] text-white hover:bg-[#143F2D] active:scale-[0.98] transition-all shadow-lg shadow-[#0C281C]/25 border border-[#184E37] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#84CC16]/60 cursor-pointer group ${isLoading ? "opacity-75 cursor-not-allowed" : ""
-                  }`}
+                disabled={isLoading || isExtracting}
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-3.5 rounded-full text-base font-semibold bg-[#0C281C] text-white hover:bg-[#143F2D] active:scale-[0.98] transition-all shadow-lg shadow-[#0C281C]/25 border border-[#184E37] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#84CC16]/60 cursor-pointer group ${
+                  isLoading || isExtracting ? "opacity-75 cursor-not-allowed" : ""
+                }`}
               >
                 {isLoading ? (
                   <>
@@ -649,18 +1062,15 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
             </div>
           </div>
 
-          {/* Helper message */}
           <div className="flex items-start gap-2.5 pt-3 text-xs text-[#52655D] bg-[#F8F5EE]/80 rounded-xl p-3 border border-[#E8E2D5]">
             <Info className="w-4 h-4 text-[#1C543C] shrink-0 mt-0.5" />
             <p>
-              <strong className="font-semibold text-[#0C281C]">Tip:</strong> Paste text from any
-              government gazette, policy paper, CBN circular, or agency announcement. You can also click the
-              quick samples above to test how it works right away.
+              <strong className="font-semibold text-[#0C281C]">Tip:</strong> You can upload official
+              PDF gazettes, Word .docx circulars, or plain text announcements. Or toggle to paste text directly.
             </p>
           </div>
         </form>
 
-        {/* Loading State Display */}
         {isLoading && (
           <div
             id="breakdown-loading"
@@ -684,7 +1094,6 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
                 Muse Spark is translating official terminology into clear, structured {selectedLangLabel}.
               </p>
 
-              {/* Pulsing placeholder skeleton */}
               <div className="w-full max-w-md mt-6 space-y-3">
                 <div className="h-3 bg-[#D4E8DC] rounded-full w-3/4 mx-auto animate-pulse" />
                 <div
@@ -700,7 +1109,6 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
           </div>
         )}
 
-        {/* API Error Display */}
         {apiError && !isLoading && (
           <div
             id="breakdown-error"
@@ -739,13 +1147,11 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
           </div>
         )}
 
-        {/* Real AI Explanation Breakdown Section */}
         {explanationResult && !isLoading && (
           <div
             id="breakdown-preview"
             className="mt-8 pt-8 border-t border-[#E8E2D5] animate-in fade-in slide-in-from-bottom-3 duration-300"
           >
-            {/* Status notice */}
             <div className="rounded-2xl bg-[#F0F8F3] border border-[#C6E6D2] p-5 mb-6">
               <div className="flex items-start gap-3.5">
                 <div className="p-2 rounded-xl bg-[#0C281C] text-[#BEF264] shrink-0 mt-0.5">
@@ -770,14 +1176,12 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
               </div>
             </div>
 
-            {/* Accessible Audio Narration Control */}
             <ExplanationAudioControl
               key={`${explanationResult.language}-${explanationResult.explanation.slice(0, 32)}`}
               textToRead={explanationResult.explanation}
               language={explanationResult.language}
             />
 
-            {/* Interactive breakdown preview card */}
             <div className="rounded-2xl bg-[#FCFAF6] border border-[#DDD5C5] p-5 sm:p-7 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E8E2D5]">
                 <div className="flex items-center gap-2">
@@ -805,7 +1209,6 @@ export default function DocumentInputCard({ selectedSample }: DocumentInputCardP
                 </button>
               </div>
 
-              {/* Breakdown body rendered in structured readable sections */}
               <div className="mt-6 space-y-6">
                 {parsedSections.map((sec, sIdx) => {
                   const style = getSectionStyle(sec.num);

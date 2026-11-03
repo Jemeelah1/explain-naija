@@ -44,7 +44,6 @@ export default function FeaturesSection() {
   return (
     <section id="features" className="py-20 sm:py-28 bg-[#F8F5EE] border-t border-[#E8E2D5] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto">
           <span className="text-xs font-semibold uppercase tracking-widest text-[#1C543C] bg-[#E7F3EC] px-3.5 py-1.5 rounded-full border border-[#C6E6D2] inline-block mb-4">
             Why Explain Naija
@@ -57,7 +56,6 @@ export default function FeaturesSection() {
           </p>
         </div>
 
-        {/* Feature Cards Grid */}
         <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feat, idx) => {
             const Icon = feat.icon;

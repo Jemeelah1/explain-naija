@@ -6,7 +6,6 @@ export default function AboutSection() {
     <section id="about" className="py-20 sm:py-28 bg-[#FDFBF7] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="rounded-3xl bg-[#0C281C] text-white p-8 sm:p-12 md:p-16 relative overflow-hidden shadow-2xl border border-[#184E37]">
-          {/* Subtle lime decorative glow */}
           <div
             className="absolute top-0 right-0 w-96 h-96 bg-[#84CC16]/15 rounded-full blur-3xl pointer-events-none"
             aria-hidden="true"
@@ -30,7 +29,6 @@ export default function AboutSection() {
               Explain Naija was created to translate that institutional complexity into crystal-clear everyday knowledge. Whether you are a roadside shop owner in Aba, a software engineer in Yaba, a student in Kano, or a civil servant in Abuja—clarity belongs to you.
             </p>
 
-            {/* Core Values / Stats */}
             <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-6 pt-8 border-t border-[#1C543C]">
               <div className="flex items-start gap-3">
                 <Users2 className="w-5 h-5 text-[#84CC16] shrink-0 mt-1" />

@@ -19,25 +19,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FDFBF7] text-[#1A2421] selection:bg-[#BEF264] selection:text-[#0C281C]">
-      {/* 1. NAVBAR */}
       <Navbar />
 
       <main className="flex-1">
-        {/* 2. HERO SECTION (contains prominent DocumentInputCard) */}
         <HeroSection selectedSample={selectedSample} />
-
-        {/* 3. EXAMPLE SECTION */}
         <ExampleSection onSelectSample={handleSelectSample} />
-
-        {/* 4. HOW IT WORKS */}
         <HowItWorks />
-
-        {/* BONUS ENHANCEMENTS: FEATURES & ABOUT */}
         <FeaturesSection />
         <AboutSection />
       </main>
 
-      {/* 5. FOOTER */}
       <Footer />
     </div>
   );

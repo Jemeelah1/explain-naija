@@ -72,7 +72,6 @@ export default function ExampleSection({ onSelectSample }: ExampleSectionProps) 
   return (
     <section id="examples" className="py-20 sm:py-28 bg-[#F8F5EE] border-y border-[#E8E2D5] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto">
           <span className="text-xs font-semibold uppercase tracking-widest text-[#1C543C] bg-[#E7F3EC] px-3.5 py-1.5 rounded-full border border-[#C6E6D2] inline-block mb-4">
             Real Scenarios
@@ -85,7 +84,6 @@ export default function ExampleSection({ onSelectSample }: ExampleSectionProps) 
           </p>
         </div>
 
-        {/* 3 Sample Cards */}
         <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-8">
           {cards.map((card, idx) => {
             const Icon = card.icon;
@@ -94,11 +92,9 @@ export default function ExampleSection({ onSelectSample }: ExampleSectionProps) 
                 key={idx}
                 className="rounded-3xl bg-white border border-[#E2DDD1] p-6 sm:p-8 flex flex-col justify-between hover:shadow-xl hover:shadow-[#0C281C]/5 transition-all duration-300 group hover:-translate-y-1 relative overflow-hidden"
               >
-                {/* Subtle top card accent */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-[#0C281C] group-hover:bg-[#84CC16] transition-colors" />
 
                 <div>
-                  {/* Category Tag & Icon */}
                   <div className="flex items-center justify-between mb-6">
                     <div className="w-12 h-12 rounded-2xl bg-[#E7F3EC] group-hover:bg-[#0C281C] text-[#0C281C] group-hover:text-[#BEF264] flex items-center justify-center transition-colors shadow-xs">
                       <Icon className="w-6 h-6" />
@@ -108,17 +104,14 @@ export default function ExampleSection({ onSelectSample }: ExampleSectionProps) 
                     </span>
                   </div>
 
-                  {/* Title */}
                   <h3 className="text-xl font-bold text-[#0C281C] group-hover:text-[#184E37] transition-colors">
                     {card.title}
                   </h3>
 
-                  {/* Description */}
                   <p className="mt-3 text-sm text-[#4B5E55] leading-relaxed">
                     {card.description}
                   </p>
 
-                  {/* Before & After comparison box */}
                   <div className="mt-6 rounded-2xl bg-[#FCFAF6] border border-[#E8E2D5] p-4 text-xs space-y-2.5">
                     <div>
                       <span className="text-[11px] font-bold uppercase tracking-wider text-[#7A6455] block mb-0.5">
@@ -140,7 +133,6 @@ export default function ExampleSection({ onSelectSample }: ExampleSectionProps) 
                   </div>
                 </div>
 
-                {/* Card Action */}
                 <div className="mt-6 pt-4 border-t border-[#F2EDE2]">
                   <button
                     type="button"
