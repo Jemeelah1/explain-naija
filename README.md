@@ -226,7 +226,7 @@ Potential future improvements include:
 
 👩🏽‍💻 Built By
 
-Jemila Ibrahim
+Jemila Dotto Ibrahim
 
 Frontend Developer | AI Enthusiast
 
